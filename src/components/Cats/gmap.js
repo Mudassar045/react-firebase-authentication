@@ -3,11 +3,15 @@ import MapMarker from "./../../images/mapmarker.svg";
 import ReactMapGL, { Marker, FlyToInterpolator, Popup } from "react-map-gl";
 import useSupercluster from "use-supercluster";
 
-const MapMarkerImage = () => (
-  <img src={MapMarker} height={40} width={40} />
+const MapMarkerImage = ({pointCount}) => (
+  <div>
+    <img src={MapMarker} height={40} width={40} />
+    {pointCount}
+  </div>
 );
 
 const MapContainer = (props) => {
+
   const [viewport, setViewport] = useState({
     latitude: 51.5074,
     longitude:  0.1278,
@@ -15,10 +19,6 @@ const MapContainer = (props) => {
     height: "80vh",
     zoom: 9
   });
-
-
-  const [selectedCat, setSelectedCat] = useState(null);
-
 
   const mapRef = React.useRef();
 
@@ -61,21 +61,6 @@ const MapContainer = (props) => {
         }}
         ref={mapRef}
       >
-        {selectedCat ? (
-          <Popup
-            latitude={selectedCat.lat}
-            longitude={selectedCat.lng}
-            onClose={() => {
-              setSelectedCat(null);
-            }}
-          >
-            <a href={'/cat/'+(selectedCat.uid).substr(1)}>
-              <div className="h-48 w-48 bg-center flex-none bg-cover rounded-t text-center overflow-hidden" style={{ backgroundImage: `url(${selectedCat.imageURL})` }}></div>
-              <h2>{selectedCat.text}</h2>
-              <p>{selectedCat.description}</p>
-            </a>
-          </Popup>
-        ) : null}
         {clusters.map(cluster => {
           const [longitude, latitude] = cluster.geometry.coordinates;
           const {
@@ -110,15 +95,7 @@ const MapContainer = (props) => {
                     });
                   }}
                 >
-                           <button
-              className="marker-btn"
-              onClick={e => {
-                e.preventDefault();
-               // setSelectedCat(cat);
-               console.log(`cluster-${cluster.id}`);
-              }}
-            ></button>
-                  {pointCount}<MapMarkerImage/>
+                  <MapMarkerImage pointCount={pointCount} />
                 </div>
               </Marker>
             );
