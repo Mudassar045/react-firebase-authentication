@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import ReactMapGL, { Marker, Popup } from "react-map-gl";
 import MapMarker from "./../../images/mapmarker.svg";
+import ReactMapGL, { Marker, FlyToInterpolator, Popup } from "react-map-gl";
+import useSupercluster from "use-supercluster";
 
 const MapMarkerImage = () => (
   <img src={MapMarker} height={40} width={40} />
@@ -15,7 +16,11 @@ const MapContainer = (props) => {
     zoom: 9
   });
 
+
   const [selectedCat, setSelectedCat] = useState(null);
+
+
+  const mapRef = React.useRef();
 
   const points = props.cats.map(cat => ({
     type: "Feature",
@@ -23,53 +28,39 @@ const MapContainer = (props) => {
     geometry: {
       type: "Point",
       coordinates: [
-        parseFloat(cat.longitude),
-        parseFloat(cat.latitude)
+        parseFloat(cat.lng),
+        parseFloat(cat.lat)
       ]
     }
   }));
 
-  console.log('points', points);
+  const bounds = mapRef.current
+    ? mapRef.current
+        .getMap()
+        .getBounds()
+        .toArray()
+        .flat()
+    : null;
 
-  // const mapRef = React.createRef();
-
-  useEffect(() => {
-    const listener = e => {
-      if (e.key === "Escape") {
-        setSelectedCat(null);
-      }
-    };
-    window.addEventListener("keydown", listener);
-
-    return () => {
-      window.removeEventListener("keydown", listener);
-    };
-  }, []);
-
-  const ref = React.createRef();
-  const onLoad = () => {
-     const bounds = ref.current.getMap().getBounds().toArray().flat();
-     ref.current.getMap().fitBounds(bounds, {
-      padding: { top: 50, bottom: 50, left: 50, right: 50 },
-      easing(t) {
-          return t * (2 - t);
-      },
+  const { clusters, supercluster } = useSupercluster({
+    points,
+    bounds,
+    zoom: viewport.zoom,
+    options: { radius: 75, maxZoom: 20 }
   });
-  };
+
 
   return (
     <div>
       <ReactMapGL
         {...viewport}
+        maxZoom={20}
         mapboxApiAccessToken={process.env.REACT_APP_MAPBOXPKEY}
-        mapStyle="mapbox://styles/mapbox/streets-v11"
-        onViewportChange={viewport => {
-          setViewport(viewport);
+        onViewportChange={newViewport => {
+          setViewport({ ...newViewport });
         }}
-        ref={ref}
-        onLoad={onLoad}
+        ref={mapRef}
       >
-
         {selectedCat ? (
           <Popup
             latitude={selectedCat.lat}
@@ -85,25 +76,63 @@ const MapContainer = (props) => {
             </a>
           </Popup>
         ) : null}
+        {clusters.map(cluster => {
+          const [longitude, latitude] = cluster.geometry.coordinates;
+          const {
+            cluster: isCluster,
+            point_count: pointCount
+          } = cluster.properties;
 
-        {props.cats.map(cat => (
-          <Marker
-            key={cat.uid}
-            latitude={cat.lat}
-            longitude={cat.lng}
-          >
-            <button
+          if (isCluster) {
+            return (
+              <Marker
+                key={`cluster-${cluster.id}`}
+                latitude={latitude}
+                longitude={longitude}
+              >
+                <div
+                  className="cluster-marker"
+                  onClick={() => {
+                    const expansionZoom = Math.min(
+                      supercluster.getClusterExpansionZoom(cluster.id),
+                      20
+                    );
+
+                    setViewport({
+                      ...viewport,
+                      latitude,
+                      longitude,
+                      zoom: expansionZoom,
+                      transitionInterpolator: new FlyToInterpolator({
+                        speed: 2
+                      }),
+                      transitionDuration: "auto"
+                    });
+                  }}
+                >
+                           <button
               className="marker-btn"
               onClick={e => {
                 e.preventDefault();
-                setSelectedCat(cat);
+               // setSelectedCat(cat);
+               console.log(`cluster-${cluster.id}`);
               }}
+            ></button>
+                  {pointCount}<MapMarkerImage/>
+                </div>
+              </Marker>
+            );
+          }
+          return (
+            <Marker
+              key={`cat-${cluster.properties.catId}`}
+              latitude={latitude}
+              longitude={longitude}
             >
-              <MapMarkerImage />
-            </button>
-          </Marker>
-        ))}
-
+              <MapMarkerImage/>
+            </Marker>
+          );
+        })}
       </ReactMapGL>
     </div>
   );
